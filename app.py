@@ -391,27 +391,31 @@ div[data-testid="stFileUploader"] label {
     font-family: 'DM Sans', sans-serif !important;
 }
 
-/* buttons */
+/* glassmorphic buttons */
 div[data-testid="stDownloadButton"] button,
 div[data-testid="stButton"] button {
-    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     color: white !important;
-    border: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
     border-radius: 12px !important;
     padding: 12px 28px !important;
     font-family: 'Syne', sans-serif !important;
     font-weight: 600 !important;
     font-size: 14px !important;
-    letter-spacing: -0.2px !important;
+    letter-spacing: 0.2px !important;
     width: 100% !important;
-    box-shadow: 0 4px 24px rgba(99,102,241,0.3) !important;
-    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.2) !important;
+    transition: all 0.3s ease !important;
 }
 
 div[data-testid="stDownloadButton"] button:hover,
 div[data-testid="stButton"] button:hover {
-    box-shadow: 0 6px 32px rgba(99,102,241,0.45) !important;
-    transform: translateY(-1px) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 8px 32px rgba(99,102,241,0.25) !important;
+    transform: translateY(-2px) !important;
 }
 
 /* toggle */
@@ -466,7 +470,7 @@ div[data-testid="stVerticalBlock"] > div {
 
 # ── model loader ────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
-def load_model():
+def load_model(version):
     try:
         from model.architecture import Generator
         from model.inference import colorize
@@ -475,13 +479,20 @@ def load_model():
         G = Generator().to(device)
 
         import os
-        # priority order: best -> fallback
-        for ckpt_path in ['checkpoints/deploy_coco.pt',
-                          'checkpoints/phase3_coco_final.pt',
-                          'checkpoints/phase2_final.pt',
-                          'checkpoints/deploy.pt',
-                          'checkpoints/phase3_final.pt',
-                          'checkpoints/phase1_final.pt']:
+        
+        if version == "Phase 3 (Vibrant/GAN)":
+            paths_to_try = [
+                'checkpoints/deploy_coco.pt',
+                'checkpoints/phase3_coco_final.pt',
+                'checkpoints/phase3_final.pt'
+            ]
+        else:
+            paths_to_try = [
+                'checkpoints/phase2_final.pt',
+                'checkpoints/phase1_final.pt'
+            ]
+
+        for ckpt_path in paths_to_try:
             if os.path.exists(ckpt_path):
                 ckpt = torch.load(ckpt_path, map_location=device)
                 if 'ema_G' in ckpt:
@@ -511,7 +522,14 @@ def estimate_time(w, h):
 
 
 # ── load model ──────────────────────────────────────────────────────────────
-G, colorize_fn, device, ckpt_info = load_model()
+st.sidebar.markdown("<h3 style='color: white; font-family: Syne, sans-serif;'>Model Selection</h3>", unsafe_allow_html=True)
+selected_version = st.sidebar.radio(
+    "Choose version:",
+    ["Phase 3 (Vibrant/GAN)", "Phase 2 (Conservative/Structural)"],
+    help="Phase 3 has vivid GAN colors. Phase 2 is safer but less saturated."
+)
+
+G, colorize_fn, device, ckpt_info = load_model(selected_version)
 model_loaded = G is not None
 
 
