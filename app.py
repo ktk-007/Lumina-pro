@@ -725,6 +725,10 @@ with right_col:
     
     sat_boost = st.slider("Color Saturation", 1.0, 3.0, 1.5, 0.1,
                           help="Boosts the vibrancy of predicted colors. Higher = more colorful.")
+    vibrance = st.slider("Vibrance", -1.0, 1.0, 0.0, 0.1,
+                         help="Boosts intensity of muted colors without oversaturating already vibrant ones.")
+    hue_shift = st.slider("Hue Shift", -90, 90, 0, 1,
+                          help="Shifts the overall color spectrum (e.g. to fix green/magenta tints).")
     
     st.markdown('<br>', unsafe_allow_html=True)
     clahe_on   = st.toggle("CLAHE contrast", value=True)
@@ -767,7 +771,9 @@ with right_col:
                         G, img_pil,
                         device           = device,
                         apply_clahe      = clahe_on,
-                        saturation_boost = sat_boost
+                        saturation_boost = sat_boost,
+                        hue_shift        = hue_shift,
+                        vibrance         = vibrance
                     )
                     elapsed = time.time() - t0
 
