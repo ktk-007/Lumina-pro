@@ -64,8 +64,8 @@ class ColorizationDataset(Dataset):
 
             # Salt & pepper noise
             mask = np.random.random(L.shape)
-            L[mask < 0.005] = 0.0
-            L[mask > 0.995] = 1.0
+            L[mask < 0.001] = 0.0
+            L[mask > 0.999] = 1.0
 
         # --- To tensors ---
         L_tensor  = torch.from_numpy(L).unsqueeze(0)       # (1, H, W)
