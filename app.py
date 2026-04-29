@@ -30,8 +30,9 @@ html, body, .stApp {
 /* hide streamlit chrome */
 #MainMenu, footer, header, .stDeployButton { display: none !important; }
 .block-container { padding: 0 !important; max-width: 100% !important; }
-section[data-testid="stSidebar"] { display: none !important; }
-div[data-testid="stToolbar"] { display: none !important; }
+/* section[data-testid="stSidebar"] { display: none !important; } */
+/* div[data-testid="stToolbar"] { display: none !important; } */
+
 
 /* scrollbar */
 ::-webkit-scrollbar { width: 4px; }
@@ -502,7 +503,8 @@ def load_model(version):
                 G.eval()
                 return G, colorize, device, ckpt_path
 
-        return None, None, None, None
+        return None, None, None, "No valid checkpoint found for this version in 'checkpoints/' directory."
+
     except Exception as e:
         return None, None, None, str(e)
 
@@ -522,15 +524,19 @@ def estimate_time(w, h):
 
 
 # ── load model ──────────────────────────────────────────────────────────────
-st.sidebar.markdown("<h3 style='color: white; font-family: Syne, sans-serif;'>Model Selection</h3>", unsafe_allow_html=True)
-selected_version = st.sidebar.radio(
-    "Choose version:",
-    ["Phase 3 (Vibrant/GAN)", "Phase 2 (Conservative/Structural)"],
-    help="Phase 3 has vivid GAN colors. Phase 2 is safer but less saturated."
-)
+# ── model selection logic ───────────────────────────────────────────────────
+if 'selected_version' not in st.session_state:
+    st.session_state['selected_version'] = "Phase 3 (Vibrant/GAN)"
+
+selected_version = st.session_state['selected_version']
+
 
 G, colorize_fn, device, ckpt_info = load_model(selected_version)
 model_loaded = G is not None
+
+if not model_loaded and ckpt_info:
+    st.error(f"Model Load Error: {ckpt_info}")
+
 
 
 # ── layout ───────────────────────────────────────────────────────────────────
@@ -674,7 +680,30 @@ with left_col:
 
 
 with right_col:
+    st.markdown('<div class="section-label">Settings</div>', unsafe_allow_html=True)
+
+    # model selection card
+    st.markdown('<div class="control-card">', unsafe_allow_html=True)
+    st.markdown('<div class="control-title">Model Version</div>', unsafe_allow_html=True)
+    
+    # We use a selectbox or radio here. Given the design, a selectbox or a custom-styled radio is better.
+    # But let's stick to st.radio for clarity as a 'toggler'.
+    new_version = st.radio(
+        "Select Engine",
+        ["Phase 3 (Vibrant/GAN)", "Phase 2 (Conservative/Structural)"],
+        index=0 if st.session_state['selected_version'] == "Phase 3 (Vibrant/GAN)" else 1,
+        label_visibility="collapsed"
+    )
+    
+    if new_version != st.session_state['selected_version']:
+        st.session_state['selected_version'] = new_version
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('<br>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Controls</div>', unsafe_allow_html=True)
+
 
     # enhancement controls
     st.markdown('<div class="control-card">', unsafe_allow_html=True)
@@ -779,32 +808,5 @@ with right_col:
             </div>
             """, unsafe_allow_html=True)
 
-    # model info
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div style="padding:16px; background:rgba(255,255,255,0.02);
-         border:1px solid rgba(255,255,255,0.04); border-radius:14px;">
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.1em;
-             color:rgba(255,255,255,0.2); margin-bottom:12px; font-weight:500;">
-             Architecture
-        </div>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-            {''.join([f'''
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:12px; color:rgba(255,255,255,0.3); font-family:sans-serif;">{k}</span>
-                <span style="font-size:11px; color:rgba(99,102,241,0.8); font-family:sans-serif;
-                      background:rgba(99,102,241,0.08); padding:2px 8px; border-radius:6px;">{v}</span>
-            </div>''' for k,v in [
-                ('Encoder', 'ConvNeXt-Tiny'),
-                ('Pretrain', 'ImageNet-22K'),
-                ('Decoder', 'PixelShuffle'),
-                ('Attention', 'ECA'),
-                ('Critic', 'PatchGAN 70×70'),
-                ('Upsampling', 'Joint Bilateral'),
-            ]])}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
-
-# st.markdown('</div>', unsafe_allow_html=True)  # close lp-wrap
+# end of file
