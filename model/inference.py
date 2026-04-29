@@ -69,7 +69,7 @@ def load_model(checkpoint_path, device='cuda'):
 # ─────────────────────────────────────────
 # 3. COLORIZE — CORE FUNCTION
 # ─────────────────────────────────────────
-def colorize(G, image_input, device='cuda', apply_clahe=True, saturation_boost=1.0, hue_shift=0.0, vibrance=0.0):
+def colorize(G, image_input, device='cuda', apply_clahe=True, saturation_boost=1.0):
     """
     G                : loaded Generator in eval mode
     image_input      : PIL Image or numpy (H,W,3) RGB
@@ -131,25 +131,6 @@ def colorize(G, image_input, device='cuda', apply_clahe=True, saturation_boost=1
         clahe           = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         lab_clahe[:, :, 0] = clahe.apply(lab_clahe[:, :, 0])
         rgb_result      = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2RGB)
-
-    # --- optional Hue and Vibrance adjustments ---
-    if hue_shift != 0.0 or vibrance != 0.0:
-        hsv = cv2.cvtColor(rgb_result, cv2.COLOR_RGB2HSV).astype(np.float32)
-        
-        if hue_shift != 0.0:
-            h = hsv[:, :, 0]
-            # OpenCV Hue is 0-179. hue_shift is -90 to 90 degrees.
-            h = (h + (hue_shift / 2.0)) % 180.0
-            hsv[:, :, 0] = h
-            
-        if vibrance != 0.0:
-            s = hsv[:, :, 1]
-            s_norm = s / 255.0
-            # Vibrance logic: target less saturated pixels
-            s_adj = s_norm + (vibrance * (1.0 - s_norm))
-            hsv[:, :, 1] = np.clip(s_adj * 255.0, 0, 255)
-            
-        rgb_result = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
 
     return rgb_result
 
