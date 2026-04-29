@@ -18,6 +18,10 @@ wandb/
 checkpoints/*
 !checkpoints/deploy_coco.pt
 !checkpoints/phase3_coco_final.pt
+!checkpoints/phase2_final.pt
+
+
+
 
 # Media and logs
 *.png
