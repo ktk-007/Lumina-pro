@@ -21,19 +21,24 @@ from model.losses       import LossManager
 # CONFIG — change these per phase
 # ─────────────────────────────────────────
 CFG = {
-    'phase'      : 3,
+    'phase'      : 4,           # Phase 4 = Scenic Fine-tuning
     'batch_size' : 2,
-    'epochs'     : 25,
-    'resume'     : 'checkpoints/phase3_coco_final.pt',
+    'epochs'     : 15,          # 15 epochs for maximum quality
+
+
+
+    'resume'     : 'checkpoints/deploy_coco.pt',
     'data_dir'   : 'data/val2017',
+    'scenic_dir' : 'data/landscape', # Path to Kaggle Landscape dataset
     'ckpt_dir'   : 'checkpoints',
     'img_size'   : 256,
     'num_workers': 0,
 
-    # learning rates
-    'lr_encoder' : 1e-5,
-    'lr_decoder' : 1e-4,
-    'lr_disc'    : 1e-6,
+    # fine-tuning learning rates (lower for stability)
+    'lr_encoder' : 5e-6,
+    'lr_decoder' : 5e-5,
+    'lr_disc'    : 5e-7,
+
 
     # loss weights
     'w_huber'    : 1.0,
@@ -74,7 +79,11 @@ def save_checkpoint(state, path):
 
 def load_checkpoint(path, G, D=None, opt_G=None, opt_D=None, scaler=None):
     ckpt = torch.load(path, map_location='cuda')
-    G.load_state_dict(ckpt['G'])
+    if 'G' in ckpt:
+        G.load_state_dict(ckpt['G'], strict=False)
+    elif 'ema_G' in ckpt:
+        G.load_state_dict(ckpt['ema_G'], strict=False)
+        
     if D is not None and 'D' in ckpt:
         D.load_state_dict(ckpt['D'])
     if opt_G is not None and 'opt_G' in ckpt:
@@ -491,6 +500,79 @@ def run_phase3(G, loader, losses, device, cfg):
     print("\nPhase 3 complete. Deploy checkpoint saved as deploy_coco.pt")
 
 
+# ─────────────────────────────────────────
+# PHASE 4 — Scenic Fine-tuning (Mixed Batch)
+# ─────────────────────────────────────────
+def run_phase3_v2_scenic(G, losses, device, cfg):
+    print("\n=== PHASE 3 v2: Scenic Fine-Tuning (Nature/Landscape) ===")
+    print("  Strategy: Full Epoch on Super-Dataset (Balanced Nature + Objects)")
+    
+    # 1. Create Loader from the new Super-Dataset
+    ds_scenic = ColorizationDataset(cfg['scenic_dir'], img_size=cfg['img_size'], augment=True)
+    loader_scenic = DataLoader(ds_scenic, batch_size=cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'])
+
+
+    D = PatchGAN().to(device)
+    G.unfreeze_encoder()
+
+    opt_G = torch.optim.AdamW([
+        {'params': G.encoder.parameters(),    'lr': cfg['lr_encoder']},
+        {'params': G.bottleneck.parameters(), 'lr': cfg['lr_decoder']},
+        {'params': G.d4.parameters(),         'lr': cfg['lr_decoder']},
+        {'params': G.d3.parameters(),         'lr': cfg['lr_decoder']},
+        {'params': G.d2.parameters(),         'lr': cfg['lr_decoder']},
+        {'params': G.d1.parameters(),         'lr': cfg['lr_decoder']},
+        {'params': G.head.parameters(),       'lr': cfg['lr_decoder']},
+    ], weight_decay=1e-4)
+
+    opt_D = torch.optim.AdamW(D.parameters(), lr=cfg['lr_disc'], betas=(0.5, 0.999))
+    scaler_G, scaler_D = torch.amp.GradScaler('cuda'), torch.amp.GradScaler('cuda')
+    ema_G = AveragedModel(G, multi_avg_fn=get_ema_multi_avg_fn(cfg['ema_decay']))
+
+    if cfg['resume']:
+        load_checkpoint(cfg['resume'], G, D, opt_G, opt_D, scaler_G)
+
+    for epoch in range(cfg['epochs']):
+        G.train(); D.train()
+        loop = tqdm(loader_scenic, desc=f"Scenic Epoch {epoch+1}/{cfg['epochs']}")
+        
+        for batch_idx, (L, ab_real) in enumerate(loop):
+            # Process EVERY image in the Super-Dataset (no skipping)
+            L, ab_real = L.to(device), ab_real.to(device)
+
+
+            # Standard GAN Step
+            opt_G.zero_grad(); opt_D.zero_grad()
+            with torch.amp.autocast('cuda'):
+                ab_fake = G(L)
+                fake_logits = D(L, ab_fake)
+                real_logits = D(L, ab_real)
+                
+                # We use high histogram loss weight here to force the scenic colors
+                g_loss, log = losses.generator_loss(
+                    L, ab_fake, ab_real, fake_logits=fake_logits,
+                    w_huber=1.0, w_vgg=0.5, w_gan=0.5, w_tv=0.01, w_hist=0.2 
+                )
+                d_loss = losses.discriminator_loss(real_logits, fake_logits.detach())
+
+            scaler_G.scale(g_loss).backward()
+            scaler_G.step(opt_G); scaler_G.update()
+            
+            scaler_D.scale(d_loss).backward()
+            scaler_D.step(opt_D); scaler_D.update()
+            
+            ema_G.update_parameters(G)
+            loop.set_postfix({'G': f"{g_loss.item():.3f}", 'D': f"{d_loss.item():.3f}"})
+
+        save_checkpoint({
+            'ema_G': ema_G.module.state_dict(),
+            'G': G.state_dict(),
+        }, f"{cfg['ckpt_dir']}/phase3v2_final.pt")
+
+    print("\nScenic Fine-tuning Complete. Saved as phase3v2_final.pt")
+
+
+
 def log_sample_images(G, loader, device, epoch, phase, n=4):
     import os
     import numpy as np
@@ -570,6 +652,10 @@ def main():
     elif CFG['phase'] == 3:
         CFG['resume'] = CFG['resume'] or 'checkpoints/phase2_final.pt'
         run_phase3(G, loader, losses, device, CFG)
+    elif CFG['phase'] == 4:
+        CFG['resume'] = CFG['resume'] or 'checkpoints/deploy_coco.pt'
+        run_phase3_v2_scenic(G, losses, device, CFG)
+
     else:
         print("Set CFG['phase'] to 1, 2, or 3")
     print("Training session finished.")

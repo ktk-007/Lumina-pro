@@ -481,7 +481,12 @@ def load_model(version):
 
         import os
         
-        if version == "Phase 3 (Vibrant/GAN)":
+        if version == "Phase 3 Scenic (Nature/Landscape)":
+            paths_to_try = [
+                'checkpoints/phase3v2_final.pt',
+                'checkpoints/phase3_scenic_final.pt'
+            ]
+        elif version == "Phase 3 (Vibrant/GAN)":
             paths_to_try = [
                 'checkpoints/deploy_coco.pt',
                 'checkpoints/phase3_coco_final.pt',
@@ -492,6 +497,7 @@ def load_model(version):
                 'checkpoints/phase2_final.pt',
                 'checkpoints/phase1_final.pt'
             ]
+
 
         for ckpt_path in paths_to_try:
             if os.path.exists(ckpt_path):
@@ -697,10 +703,11 @@ with right_col:
     # But let's stick to st.radio for clarity as a 'toggler'.
     new_version = st.radio(
         "Select Engine",
-        ["Phase 3 (Vibrant/GAN)", "Phase 2 (Conservative/Structural)"],
-        index=0 if st.session_state['selected_version'] == "Phase 3 (Vibrant/GAN)" else 1,
+        ["Phase 3 (Vibrant/GAN)", "Phase 3 Scenic (Nature/Landscape)", "Phase 2 (Conservative/Structural)"],
+        index=["Phase 3 (Vibrant/GAN)", "Phase 3 Scenic (Nature/Landscape)", "Phase 2 (Conservative/Structural)"].index(st.session_state['selected_version']),
         label_visibility="collapsed"
     )
+
     
     if new_version != st.session_state['selected_version']:
         st.session_state['selected_version'] = new_version

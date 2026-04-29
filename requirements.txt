@@ -6,3 +6,4 @@ pillow
 opencv-contrib-python-headless
 scikit-image
 timm
+
