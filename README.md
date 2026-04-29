@@ -2,7 +2,7 @@
 
 Lumina Pro is a state-of-the-art image colorization pipeline leveraging a hybrid **ConvNeXt-UNet** architecture with adversarial refinement. It is designed to transform grayscale images into vibrant, realistically colorized photos using a multi-phase training strategy.
 
-🔗 **Live App:** https://your-streamlit-link.streamlit.app
+🔗 **Live App:** https://lumina-pro-convnextunet.streamlit.app/
 
 ## 🚀 Features
 - **Hybrid Architecture**: ConvNeXt-Tiny encoder for deep semantic features + PixelShuffle decoder for high-fidelity spatial reconstruction.
