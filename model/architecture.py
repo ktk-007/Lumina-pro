@@ -94,9 +94,10 @@ class Generator(nn.Module):
         # --- Encoder ---
         self.encoder = timm.create_model(
             'convnext_tiny.fb_in22k',
-            pretrained=True,
+            pretrained=False,
             features_only=True
         )
+
         # freeze encoder for Phase 1
         for p in self.encoder.parameters():
             p.requires_grad = False
