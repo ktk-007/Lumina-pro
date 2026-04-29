@@ -586,6 +586,13 @@ with left_col:
 
     if uploaded:
         img_pil = Image.open(uploaded).convert('RGB')
+        
+        # Prevent OOM crashes on Streamlit Cloud by capping resolution
+        max_size = 1024
+        if max(img_pil.size) > max_size:
+            img_pil.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            st.toast(f"Image automatically resized to {img_pil.size[0]}x{img_pil.size[1]} to prevent memory crash.")
+
         img_np  = np.array(img_pil)
         W, H    = img_pil.size
 
