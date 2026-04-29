@@ -98,8 +98,13 @@ def colorize(G, image_input, device='cuda', apply_clahe=True, saturation_boost=1
 
     # --- forward pass ---
     with torch.no_grad():
-        with torch.amp.autocast('cuda'):
-            ab_pred = G(L_tensor)         # (1, 2, 256, 256)
+        # Use autocast only if on CUDA
+        if device == 'cuda':
+            with torch.amp.autocast('cuda'):
+                ab_pred = G(L_tensor)
+        else:
+            ab_pred = G(L_tensor)
+
 
     ab_pred = ab_pred.squeeze(0).permute(1, 2, 0).cpu().numpy()
     ab_pred = ab_pred * 128.0             # denormalize -> [-128, 128]
